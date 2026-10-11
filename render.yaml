@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: portfolio-call-backend
+    runtime: node
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: HOST_EMAIL
+        sync: false
+      - key: HOST_PASSWORD_HASH
+        sync: false

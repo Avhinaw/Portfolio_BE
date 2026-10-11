@@ -242,6 +242,15 @@ public HTTPS domain.
 2. `docker compose up -d --build` (backend only on `127.0.0.1:3000`).
 3. Reverse proxy with HTTPS (WebSocket upgrade required).
 
+### Deploying on Render
+The repository includes `render.yaml` with the correct repository root, TypeScript build command, start command, and health check.
+Create or update a Render Blueprint from this repository to apply it. For an existing Web Service that is not managed by a Blueprint,
+set **Root Directory** to the repository root (leave it blank), **Build Command** to `npm ci && npm run build`, and
+**Start Command** to `npm start`, then trigger a new deploy. The build log must show `tsc -p tsconfig.build.json` completing
+successfully before the service starts; this produces `dist/server.js` at the repository root. Set `MONGODB_URI`,
+`FRONTEND_ORIGINS`, `HOST_EMAIL`, and `HOST_PASSWORD_HASH` in Render's environment settings. Configure a strong
+`JWT_ACCESS_SECRET` there as well (the Blueprint generates one for new Blueprint-managed services). Do not upload `.env` to Git.
+
 Caddy (automatic certificates):
 ```
 api.example.com {
