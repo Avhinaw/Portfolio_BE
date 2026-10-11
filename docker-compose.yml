@@ -1,0 +1,50 @@
+# Local / single-VPS stack.
+#   docker compose up -d --build                 # backend + MongoDB
+#   docker compose --profile turn up -d --build  # + coturn (needs TURN_EXTERNAL_IP, TURN_SHARED_SECRET)
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    # Not published: only the backend container can reach MongoDB.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      # Overrides MONGODB_URI from .env: "mongo" is only resolvable INSIDE the compose network.
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/portfolio_calls?authSource=admin
+    ports:
+      # Bound to localhost: put nginx/Caddy (TLS) in front. Browsers on other devices never see "mongo".
+      - "127.0.0.1:3000:3000"
+
+  coturn:
+    profiles: ["turn"]
+    image: coturn/coturn:4.6
+    restart: unless-stopped
+    # Host networking is the most reliable way to expose the relay port range on Linux.
+    network_mode: host
+    volumes:
+      - ./docker/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: >
+      -c /etc/coturn/turnserver.conf
+      --external-ip=${TURN_EXTERNAL_IP}
+      --realm=${TURN_REALM}
+      --static-auth-secret=${TURN_SHARED_SECRET}
+
+volumes:
+  mongo-data:

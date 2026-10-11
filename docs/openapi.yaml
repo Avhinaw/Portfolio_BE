@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: Portfolio Video Call Backend
+  version: 1.0.0
+  description: >
+    REST API. Real-time signaling uses Socket.IO (see README). Responses are wrapped as
+    {ok:true,data} or {ok:false,error:{code,message,details?}}.
+servers:
+  - url: http://localhost:3000
+components:
+  securitySchemes:
+    hostBearer: { type: http, scheme: bearer, bearerFormat: JWT }
+    visitorToken: { type: apiKey, in: header, name: X-Visitor-Token }
+  schemas:
+    Error:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, enum: [false] }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: invalid_state }
+            message: { type: string }
+            details: {}
+    Status: { type: string, enum: [pending, accepted, rejected, in_progress, ended, expired, cancelled] }
+    PublicStatus:
+      type: object
+      properties:
+        roomId: { type: string, minLength: 32, maxLength: 32 }
+        status: { $ref: '#/components/schemas/Status' }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        endedAt: { type: string, format: date-time, nullable: true }
+    HostMeeting:
+      type: object
+      properties:
+        roomId: { type: string }
+        visitorName: { type: string }
+        visitorMessage: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/Status' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        endedAt: { type: string, format: date-time, nullable: true }
+        endedBy: { type: string, enum: [host, visitor, system], nullable: true }
+        maxEndsAt: { type: string, format: date-time, nullable: true }
+        visitorOnline: { type: boolean }
+        notification:
+          type: object
+          properties:
+            status: { type: string, enum: [pending, sent, failed, skipped] }
+            attempts: { type: integer }
+  responses:
+    Err: { description: Error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  parameters:
+    roomId: { name: roomId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{32}$' } }
+paths:
+  /api/health:
+    get:
+      summary: Health and database connectivity
+      responses: { '200': { description: ok }, '503': { description: database down } }
+  /api/availability:
+    get: { summary: Public availability, responses: { '200': { description: '{available,busy}' } } }
+  /api/meetings:
+    post:
+      summary: Create a meeting request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [visitorName]
+              properties:
+                visitorName: { type: string, minLength: 1, maxLength: 80 }
+                visitorMessage: { type: string, maxLength: 500 }
+      responses:
+        '201': { description: Created. visitorToken is returned once. }
+        '400': { $ref: '#/components/responses/Err' }
+        '409': { $ref: '#/components/responses/Err' }
+        '429': { $ref: '#/components/responses/Err' }
+        '503': { $ref: '#/components/responses/Err' }
+  /api/meetings/{roomId}/status:
+    get:
+      summary: Public-safe status
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses:
+        '200': { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/PublicStatus' } } } }
+        '404': { $ref: '#/components/responses/Err' }
+  /api/meetings/{roomId}/cancel:
+    post:
+      summary: Cancel own pending/accepted request
+      security: [{ visitorToken: [] }]
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses: { '200': { description: cancelled }, '401': { $ref: '#/components/responses/Err' }, '403': { $ref: '#/components/responses/Err' }, '409': { $ref: '#/components/responses/Err' } }
+  /api/meetings/{roomId}/ice-servers:
+    get:
+      summary: ICE servers for the visitor browser
+      security: [{ visitorToken: [] }]
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses: { '200': { description: '{iceServers:[...]}' }, '403': { $ref: '#/components/responses/Err' }, '409': { $ref: '#/components/responses/Err' } }
+  /api/host/auth/login:
+    post:
+      summary: Host login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties: { email: { type: string, format: email }, password: { type: string } }
+      responses: { '200': { description: '{accessToken, tokenType, expiresAt}' }, '401': { $ref: '#/components/responses/Err' }, '429': { $ref: '#/components/responses/Err' } }
+  /api/host/auth/logout:
+    post: { summary: Revoke session, security: [{ hostBearer: [] }], responses: { '200': { description: ok }, '401': { $ref: '#/components/responses/Err' } } }
+  /api/host/meetings:
+    get:
+      summary: List recent and pending meetings
+      security: [{ hostBearer: [] }]
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/Status' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses: { '200': { description: '{meetings: HostMeeting[]}' } }
+  /api/host/meetings/bulk/reject-pending:
+    post: { summary: Reject all pending, security: [{ hostBearer: [] }], responses: { '200': { description: '{rejected:n}' } } }
+  /api/host/meetings/{roomId}:
+    get:
+      security: [{ hostBearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses: { '200': { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/HostMeeting' } } } }, '404': { $ref: '#/components/responses/Err' } }
+  /api/host/meetings/{roomId}/accept:
+    post:
+      security: [{ hostBearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses: { '200': { description: accepted }, '409': { description: 'host_busy | meeting_expired | invalid_state' } }
+  /api/host/meetings/{roomId}/reject:
+    post:
+      security: [{ hostBearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses: { '200': { description: rejected }, '409': { description: 'meeting_expired | invalid_state' } }
+  /api/host/meetings/{roomId}/end:
+    post:
+      security: [{ hostBearer: [] }]
+      parameters: [{ $ref: '#/components/parameters/roomId' }]
+      responses: { '200': { description: ended }, '409': { description: invalid_state } }
+  /api/host/availability:
+    get: { security: [{ hostBearer: [] }], responses: { '200': { description: ok } } }
+    put:
+      security: [{ hostBearer: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [available], properties: { available: { type: boolean } } } } } }
+      responses: { '200': { description: ok } }
+  /api/host/ice-servers:
+    get: { security: [{ hostBearer: [] }], responses: { '200': { description: '{iceServers:[...]}' } } }
+  /api/host/telegram/test:
+    post: { security: [{ hostBearer: [] }], responses: { '200': { description: delivered }, '409': { description: not configured }, '502': { description: Telegram rejected the message } } }
