@@ -16,6 +16,7 @@ import { emitToHosts, emitToRole, rooms } from '../services/realtime';
 import type { Ack, SocketData, SocketRole } from '../types/socket';
 import { AppError, forbidden } from '../utils/errors';
 import { logger } from '../utils/logger';
+import { isTerminal } from '../services/meeting.state';
 import {
   answerPayload,
   connectionFailedPayload,
@@ -123,7 +124,11 @@ export function registerMeetingHandlers(io: Server, socket: Socket): void {
     } else if (!socket.rooms.has(rooms.meetingHost(roomId))) {
       throw forbidden('wrong_room', 'Not authorized for this meeting');
     }
-    await requireSignalingState(roomId);
+    const meeting = await requireSignalingState(roomId);
+    const registeredSocketId = data.role === 'host' ? meeting.hostSocketId : meeting.visitorSocketId;
+    if (registeredSocketId !== socket.id) {
+      throw forbidden('stale_socket', 'This participant connection has been replaced');
+    }
     return data.role;
   }
 
@@ -142,9 +147,12 @@ export function registerMeetingHandlers(io: Server, socket: Socket): void {
   on('host:join-room', hostJoinRoomPayload, async ({ roomId }, ack) => {
     if (data.role !== 'host') throw forbidden('host_only', 'Host only');
     const meeting = await requireSignalingState(roomId); // must be accepted or in_progress
+    const previousSocketId = await registerSocket(roomId, 'host', socket.id);
+    if (previousSocketId && previousSocketId !== socket.id) {
+      io.sockets.sockets.get(previousSocketId)?.disconnect(true);
+    }
     await socket.join([rooms.meetingHost(roomId), rooms.meeting(roomId)]);
     if (!data.joinedRooms.includes(roomId)) data.joinedRooms.push(roomId);
-    await registerSocket(roomId, 'host', socket.id);
     emitToRole(roomId, 'visitor', 'call:peer-joined', { roomId, role: 'host' });
     ack({ ok: true, data: toPublicStatus(meeting) });
   });
@@ -155,9 +163,14 @@ export function registerMeetingHandlers(io: Server, socket: Socket): void {
     if (data.role !== 'visitor' || !data.roomId) throw forbidden('visitor_only', 'Visitor only');
     if (roomId && roomId !== data.roomId) throw forbidden('wrong_room', 'Not authorized for this meeting');
     const bound = data.roomId;
-    await socket.join([rooms.meetingVisitor(bound), rooms.meeting(bound)]);
-    await registerSocket(bound, 'visitor', socket.id);
     const status = await getPublicStatus(bound);
+    if (!isTerminal(status.status)) {
+      const previousSocketId = await registerSocket(bound, 'visitor', socket.id);
+      if (previousSocketId && previousSocketId !== socket.id) {
+        io.sockets.sockets.get(previousSocketId)?.disconnect(true);
+      }
+    }
+    await socket.join([rooms.meetingVisitor(bound), rooms.meeting(bound)]);
     socket.emit('meeting:status', { ...status, endedBy: null, reason: null });
     emitToHosts('meeting:visitor-connected', { roomId: bound });
     emitToRole(bound, 'host', 'call:peer-joined', { roomId: bound, role: 'visitor' });
@@ -168,13 +181,14 @@ export function registerMeetingHandlers(io: Server, socket: Socket): void {
 
   on('call:ready', roomPayload, async ({ roomId }, ack) => {
     const role = await authorize(roomId);
-    if (!data.readyRooms.includes(roomId)) data.readyRooms.push(roomId);
-    emitToRole(roomId, other(role), 'call:peer-ready', { roomId, role });
+    const newlyReady = !data.readyRooms.includes(roomId);
+    if (newlyReady) data.readyRooms.push(roomId);
+    if (newlyReady) emitToRole(roomId, other(role), 'call:peer-ready', { roomId, role });
 
     // The host is always the caller. It is told to create the offer once BOTH sides have local media ready.
     const peers = await io.in(role === 'host' ? rooms.meetingVisitor(roomId) : rooms.meetingHost(roomId)).fetchSockets();
     const peerReady = peers.some((p) => (p.data as SocketData).readyRooms?.includes(roomId));
-    if (peerReady) emitToRole(roomId, 'host', 'call:begin', { roomId });
+    if (peerReady && newlyReady) emitToRole(roomId, 'host', 'call:begin', { roomId });
     ack({ ok: true, data: { peerReady } });
   });
 

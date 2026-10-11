@@ -147,22 +147,22 @@ const socket = io(API, { auth: { role: 'visitor', roomId, visitorToken }, transp
 
 | Event (client → server) | Who | Payload | Effect |
 |---|---|---|---|
-| `host:register` | host | `{}` | joins the host channel; ack `{pending[], availability}` |
-| `host:join-room` | host | `{roomId}` | meeting must be accepted/in_progress; joins signaling room |
-| `meeting:join` | visitor | `{roomId?}` (must equal handshake room) | joins waiting room; ack = public status |
-| `call:ready` | both | `{roomId}` | local media is ready. When both are ready the **host** gets `call:begin` |
+| `host:register` | host | `{}` | authenticated host joins the host channel; ack `{pending[], availability}` |
+| `host:join-room` | host | `{roomId}` | meeting must be accepted/in_progress; joins that signaling room |
+| `meeting:join` | visitor | `{roomId?}` (must equal handshake room) | joins only the meeting bound to the visitor token; ack = public status |
+| `call:ready` | both | `{roomId}` | local media and handlers are ready. Once both are ready, the **host** gets one `call:begin` |
 | `call:offer` | host only | `{roomId, sdp:{type:"offer", sdp}}` | relayed to visitor |
 | `call:answer` | visitor only | `{roomId, sdp:{type:"answer", sdp}}` | relayed to host |
 | `call:ice-candidate` | both | `{roomId, candidate:{candidate, sdpMid?, sdpMLineIndex?, usernameFragment?}}` | relayed to peer |
 | `call:connected` | both | `{roomId}` | send when `connectionState==="connected"`; both → `in_progress` |
 | `call:connection-failed` | both | `{roomId, reason:"ice_failed"\|"media_error"\|"timeout"\|"other"}` | peer receives `call:error` |
-| `call:end` | both | `{roomId}` | ends the call (`endedBy` = caller's role) |
+| `call:end` | both | `{roomId}` | ends the call (`endedBy` = caller's authenticated role); server broadcasts `call:ended` |
 
 | Event (server → client) | Payload |
 |---|---|
 | `meeting:new` (hosts) | host view of the new request |
 | `meeting:updated` (hosts) | host view after any transition |
-| `meeting:status` / `meeting:accepted` / `meeting:rejected` / `meeting:expired` / `meeting:cancelled` | `{roomId,status,createdAt,expiresAt,acceptedAt,endedAt,endedBy,reason}` |
+| `meeting:status` / `meeting:accepted` / `meeting:rejected` / `meeting:expired` / `meeting:cancelled` | `{roomId,status,createdAt,expiresAt,acceptedAt,endedAt,endedBy,reason}`; acceptance/rejection are triggered by the authenticated host REST dashboard actions |
 | `meeting:visitor-connected` / `meeting:visitor-disconnected` (hosts) | `{roomId}` |
 | `host:availability` (hosts) | availability |
 | `call:peer-joined` / `call:peer-ready` / `call:peer-disconnected` | `{roomId, role}` |
@@ -172,8 +172,15 @@ const socket = io(API, { auth: { role: 'visitor', roomId, visitorToken }, transp
 | `call:ended` | status payload; `reason`: `host_ended`, `visitor_ended`, `duration_limit`, `peer_disconnected` … |
 | `call:error` | `{code,message,event?,reason?}` (`invalid_payload`, `wrong_room`, `invalid_state`, `rate_limited`, `peer_connection_failed`, `token_expired`) |
 
-Disconnect handling: a socket clears its `visitorSocketId`/`hostSocketId` only if it is still the registered one (a reconnect is not
-clobbered). If a participant of an `accepted`/`in_progress` call drops, the peer gets `call:peer-disconnected`; after
+Negotiation is intentionally **host-offerer / visitor-answerer**. The server permits offers only from the authenticated host and answers
+only from the token-authorized visitor, so simultaneous offers (offer glare) cannot occur. `call:begin` is emitted once when both
+participants first report readiness; duplicate `call:ready` messages do not start extra negotiations. SDP is capped at 20 KB, ICE
+candidate strings at 2 KB, Socket.IO frames at 64 KB, and each socket has a rolling event-rate budget. Signaling is allowed only for
+the current registered participant socket and while the meeting is `accepted` or `in_progress`; terminal meetings cannot signal.
+
+Disconnect handling: a new socket for a participant replaces and disconnects its previous socket. Cleanup clears its
+`visitorSocketId`/`hostSocketId` only if the disconnecting socket is still the registered one (a reconnect is not clobbered). If a
+participant of an `accepted`/`in_progress` call drops, the peer gets `call:peer-disconnected`; after
 `RECONNECT_GRACE_SECONDS` without both sides, an in-progress call is ended by the system. A visitor leaving while `pending` keeps the
 request alive until it expires (they may refresh).
 
@@ -182,7 +189,7 @@ request alive until it expires (they may refresh).
 1. `POST /api/meetings` → keep `roomId` and `visitorToken` in memory (or `sessionStorage`); never put them in URLs.
 2. Open the socket (visitor auth), `emit('meeting:join')`, listen for `meeting:accepted|rejected|expired|cancelled`
    (poll `GET .../status` as a fallback). Cancel button → `POST .../cancel`.
-3. On `meeting:accepted`:
+3. On `meeting:accepted`, the host will create the offer after both participants have emitted `call:ready`; the visitor only answers:
 ```js
 const { iceServers } = (await api.get(`/api/meetings/${roomId}/ice-servers`, { 'X-Visitor-Token': visitorToken })).data;
 const pc = new RTCPeerConnection({ iceServers });
@@ -217,6 +224,11 @@ socket.on('call:answer', ({ sdp }) => pc.setRemoteDescription(sdp));
    (`call:ice-candidate`, `call:connected` as for the visitor). **End** → `POST /api/host/meetings/:roomId/end`.
 ICE candidates may arrive before `setRemoteDescription`; queue them until it completes. Candidates received via `call:ice-candidate`
 for a stale connection should be ignored after `call:ended`.
+
+The backend never receives or stores media tracks. Browsers use `getUserMedia()` and `RTCPeerConnection`; Socket.IO relays only
+validated SDP and ICE signaling data. Configure public STUN URLs with `STUN_URLS`; TURN is optional and can use the included coturn
+configuration with `TURN_URL` plus shared-secret or static credentials. TURN relays encrypted peer media only when direct ICE
+connectivity fails; it is self-hosted rather than a hosted calling provider.
 
 ## Configuration
 See `.env.example` (every variable documented; invalid configuration aborts startup with a readable message that never prints values).

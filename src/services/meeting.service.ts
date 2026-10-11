@@ -431,14 +431,26 @@ export async function rejectAllPending(): Promise<number> {
  * Connection tracking (called by the Socket.IO layer)
  * -------------------------------------------------------------------------------------------- */
 
-export async function registerSocket(roomId: string, role: 'host' | 'visitor', socketId: string): Promise<void> {
+export async function registerSocket(roomId: string, role: 'host' | 'visitor', socketId: string): Promise<string | undefined> {
   const field = role === 'host' ? 'hostSocketId' : 'visitorSocketId';
-  await Meeting.updateOne({ roomId }, { $set: { [field]: socketId } });
+  const updated = await Meeting.findOneAndUpdate(
+    { roomId, status: { $in: ['pending', ...ACTIVE_STATUSES] } },
+    { $set: { [field]: socketId } },
+    { new: false },
+  )
+    .select(field)
+    .lean<Pick<MeetingDoc, 'hostSocketId' | 'visitorSocketId'> | null>();
+  if (!updated) {
+    const current = await findByRoomId(roomId);
+    if (!current) throw notFound('meeting_not_found', 'Meeting not found');
+    throw conflict('invalid_state', `A meeting that is ${current.status} cannot accept a participant`);
+  }
   // Both sides present again: clear the "peer lost" marker.
   await Meeting.updateOne(
     { roomId, hostSocketId: { $ne: null }, visitorSocketId: { $ne: null }, peerLostAt: { $ne: null } },
     { $unset: { peerLostAt: 1 } },
   );
+  return role === 'host' ? updated.hostSocketId : updated.visitorSocketId;
 }
 
 /**

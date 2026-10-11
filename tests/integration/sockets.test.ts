@@ -192,6 +192,19 @@ describe('WebRTC signaling', () => {
     expect(late.error?.code).toBe('invalid_state');
   });
 
+  it('requests one offer when both participants become ready, even if ready is repeated', async () => {
+    const { m, host, visitor } = await acceptedCall();
+    await emitAck(visitor, 'call:ready', { roomId: m.roomId });
+    const begin = nextEvent(host, 'call:begin');
+    await emitAck(host, 'call:ready', { roomId: m.roomId });
+    await begin;
+
+    const duplicateBegin = neverReceives(host, 'call:begin');
+    await emitAck(visitor, 'call:ready', { roomId: m.roomId });
+    await emitAck(host, 'call:ready', { roomId: m.roomId });
+    expect(await duplicateBegin).toBe(true);
+  });
+
   it('refuses signaling while the meeting is still pending', async () => {
     const m = await createMeeting(server.app);
     const visitor = await visitorSocket(m);
@@ -288,6 +301,17 @@ describe('WebRTC signaling', () => {
 });
 
 describe('disconnect behaviour', () => {
+  it('replaces a participant socket on reconnect and disconnects the stale socket', async () => {
+    const { m, visitor } = await acceptedCall();
+    const disconnected = nextEvent(visitor, 'disconnect');
+    const replacement = await visitorSocket(m);
+    expect((await emitAck(replacement, 'meeting:join')).ok).toBe(true);
+    await disconnected;
+
+    expect((await Meeting.findOne({ roomId: m.roomId }).lean())?.visitorSocketId).toBe(replacement.id);
+    expect(visitor.connected).toBe(false);
+  });
+
   it('notifies the host when the visitor disconnects and clears the transient socket reference', async () => {
     const { m, host, visitor } = await acceptedCall();
     expect((await Meeting.findOne({ roomId: m.roomId }).lean())?.visitorSocketId).toBe(visitor.id);
