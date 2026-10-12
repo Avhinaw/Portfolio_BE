@@ -69,7 +69,8 @@ const envSchema = z
     SWEEP_INTERVAL_MS: int(5000, 500, 600_000),
     HOST_DEFAULT_AVAILABLE: boolStr.default('true'),
 
-    STUN_URLS: csv.default(''),
+    // Keep direct WebRTC connectivity working out of the box; configure TURN_URL for restrictive NATs.
+    STUN_URLS: csv.default('stun:stun.l.google.com:19302,stun:stun.cloudflare.com:3478'),
     /** One or more comma-separated turn:/turns: URLs. */
     TURN_URL: csv.default(''),
     TURN_USERNAME: z.string().min(1).optional(),
