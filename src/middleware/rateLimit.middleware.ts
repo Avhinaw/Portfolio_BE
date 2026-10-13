@@ -20,6 +20,7 @@ export interface RateLimiters {
   global: RateLimitRequestHandler;
   createMeeting: RateLimitRequestHandler;
   visitorAction: RateLimitRequestHandler;
+  hireBot: RateLimitRequestHandler;
   loginByIp: RateLimitRequestHandler;
   loginByEmail: RateLimitRequestHandler;
   hostApi: RateLimitRequestHandler;
@@ -37,6 +38,7 @@ export function createRateLimiters(env: Env): RateLimiters {
       limit: env.MEETING_CREATE_RATE_LIMIT_MAX,
     }),
     visitorAction: limiter({ windowMs: 60_000, limit: 30 }),
+    hireBot: limiter({ windowMs: 60_000, limit: env.HIRE_BOT_RATE_LIMIT_PER_MINUTE }),
     // Brute-force protection: only FAILED logins count, keyed by IP...
     loginByIp: limiter({
       windowMs: env.LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000,

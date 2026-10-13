@@ -64,6 +64,37 @@ paths:
     get:
       summary: Health and database connectivity
       responses: { '200': { description: ok }, '503': { description: database down } }
+  /api/hire-bot/chat:
+    post:
+      summary: Answer questions about the portfolio owner in fun or serious mode
+      description: Uses the configured Gemini API and src/data/hire-bot-profile.json. Conversation history is client-supplied and is not stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [message]
+              properties:
+                message: { type: string, minLength: 1, maxLength: 1000 }
+                mode: { type: string, enum: [fun, serious], default: serious }
+                history:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        '200': { description: '{reply:string}' }
+        '400': { $ref: '#/components/responses/Err' }
+        '429': { $ref: '#/components/responses/Err' }
+        '502': { $ref: '#/components/responses/Err' }
+        '503': { description: Gemini is not configured }
   /api/availability:
     get: { summary: Public availability, responses: { '200': { description: '{available,busy}' } } }
   /api/meetings:

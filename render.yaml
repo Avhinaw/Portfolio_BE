@@ -19,3 +19,5 @@ services:
         sync: false
       - key: HOST_PASSWORD_HASH
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false

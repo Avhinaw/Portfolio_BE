@@ -46,6 +46,10 @@ const envSchema = z
     HOST_EMAIL: z.string().email().max(254),
     HOST_PASSWORD_HASH: z.string().startsWith('$argon2id$', 'must be an Argon2id hash (npm run hash-password)'),
 
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    GEMINI_MODEL: z.string().min(1).max(100).default('gemini-2.5-flash'),
+    HIRE_BOT_RATE_LIMIT_PER_MINUTE: int(10, 1, 1000),
+
     TELEGRAM_BOT_TOKEN: z.string().min(20).optional(),
     TELEGRAM_CHAT_ID: z.string().min(1).optional(),
     TELEGRAM_TIMEOUT_MS: int(8000, 1000, 60_000),
@@ -69,7 +73,7 @@ const envSchema = z
     SWEEP_INTERVAL_MS: int(5000, 500, 600_000),
     HOST_DEFAULT_AVAILABLE: boolStr.default('true'),
 
-    STUN_URLS: csv.default(''),
+    STUN_URLS: csv.default('stun:stun.l.google.com:19302'),
     /** One or more comma-separated turn:/turns: URLs. */
     TURN_URL: csv.default(''),
     TURN_USERNAME: z.string().min(1).optional(),

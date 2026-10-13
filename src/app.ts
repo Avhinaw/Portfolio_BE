@@ -8,6 +8,7 @@ import { getEnv, type Env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { createRateLimiters } from './middleware/rateLimit.middleware';
 import { createHostRouter } from './routes/host.routes';
+import { createHireBotRouter } from './routes/hire-bot.routes';
 import { healthRouter } from './routes/health.routes';
 import { createMeetingRouter } from './routes/meeting.routes';
 import { logger } from './utils/logger';
@@ -38,6 +39,7 @@ export function createApp(env: Env = getEnv()): Express {
   app.use(express.json({ limit: '16kb', type: 'application/json' }));
 
   app.use('/api', healthRouter);
+  app.use('/api', createHireBotRouter(limits));
   app.use('/api', createMeetingRouter(limits));
   app.use('/api/host', createHostRouter(limits));
 

@@ -41,6 +41,27 @@ Everything in Docker: `docker compose up -d --build` (backend published on `127.
 Integration tests use an in-memory MongoDB (binary downloaded on first run) or, if set, `MONGODB_TEST_URI` (each run uses a
 random throw-away database name that is dropped afterwards). Telegram is blocked/mocked in tests; no real message is ever sent.
 
+## Portfolio hire bot
+The public `POST /api/hire-bot/chat` endpoint answers portfolio-owner questions using only `src/data/hire-bot-profile.json`.
+Fill in that JSON with accurate details; leave unknown fields empty rather than guessing. The model is instructed to refuse unrelated
+questions and say when profile information is missing. Chat is not stored by the backend; the frontend may send up to 10 prior
+`user`/`assistant` messages as `history`.
+
+Configure `GEMINI_API_KEY` in the deployment environment (get one from Google AI Studio; never expose it in browser code).
+`GEMINI_MODEL` defaults to `gemini-2.5-flash`; `HIRE_BOT_RATE_LIMIT_PER_MINUTE` defaults to 10 requests per IP. Without a key,
+the endpoint returns `503 hire_bot_not_configured`. Gemini free-tier availability, quotas, and terms are controlled by Google and
+may change. Profile data and user prompts are sent to Gemini to generate each answer.
+
+Example request:
+```json
+{
+  "message": "What technologies does the portfolio owner use?",
+  "mode": "serious",
+  "history": []
+}
+```
+`mode` accepts `serious` or `fun` and defaults to `serious`. Success returns `{ "ok": true, "data": { "reply": "..." } }`.
+
 ## Architecture
 ```
 src/
@@ -106,6 +127,7 @@ Schemas: [`docs/openapi.yaml`](docs/openapi.yaml). `$API` = `http://localhost:30
 | Method & path | Auth | Notes |
 |---|---|---|
 | `GET /api/health` | – | `200 {status:"ok",database:"up"}` / `503` when DB is down |
+| `POST /api/hire-bot/chat` | – (rate limited) | `{message, mode?: "fun"\|"serious", history?: [{role:"user"\|"assistant",content}]}` → `{reply}`; uses Gemini and the profile JSON |
 | `GET /api/availability` | – | `{available, busy}` |
 | `POST /api/meetings` | – (rate limited) | body `{visitorName (1-80), visitorMessage? (≤500)}` → `201 {id, roomId, status, createdAt, expiresAt, visitorToken}`. **`visitorToken` is shown once.** Errors: 400 `validation_error`, 409 `duplicate_pending`, 429 `rate_limited`, 503 `host_unavailable`/`queue_full` |
 | `GET /api/meetings/:roomId/status` | – | `{roomId,status,createdAt,expiresAt,acceptedAt,endedAt}` only; 404/400 |
@@ -195,18 +217,29 @@ const { iceServers } = (await api.get(`/api/meetings/${roomId}/ice-servers`, { '
 const pc = new RTCPeerConnection({ iceServers });
 const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });   // HTTPS or localhost
 stream.getTracks().forEach(t => pc.addTrack(t, stream));
-pc.ontrack = e => { remoteVideo.srcObject = e.streams[0]; };
+localVideo.srcObject = stream; // Set on BOTH browsers; this is only the local preview.
+pc.ontrack = e => {
+  remoteVideo.srcObject = e.streams[0] ?? new MediaStream([e.track]);
+  void remoteVideo.play().catch(console.error);
+};
 pc.onicecandidate = e => e.candidate && socket.emit('call:ice-candidate', { roomId, candidate: e.candidate.toJSON() });
 pc.onconnectionstatechange = () => {
   if (pc.connectionState === 'connected') socket.emit('call:connected', { roomId });
   if (pc.connectionState === 'failed') socket.emit('call:connection-failed', { roomId, reason: 'ice_failed' });
 };
+const pendingCandidates = [];
+let remoteDescriptionSet = false;
 socket.on('call:offer', async ({ sdp }) => {
   await pc.setRemoteDescription(sdp);
+  remoteDescriptionSet = true;
+  for (const candidate of pendingCandidates.splice(0)) await pc.addIceCandidate(candidate);
   await pc.setLocalDescription(await pc.createAnswer());
   socket.emit('call:answer', { roomId, sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
 });
-socket.on('call:ice-candidate', ({ candidate }) => pc.addIceCandidate(candidate));
+socket.on('call:ice-candidate', async ({ candidate }) => {
+  if (!remoteDescriptionSet) pendingCandidates.push(candidate);
+  else await pc.addIceCandidate(candidate);
+});
 socket.on('call:ended', () => { pc.close(); stream.getTracks().forEach(t => t.stop()); });
 socket.emit('call:ready', { roomId });          // after local media + handlers exist
 ```
@@ -222,11 +255,14 @@ socket.emit('call:offer', { roomId, sdp: { type: offer.type, sdp: offer.sdp } })
 socket.on('call:answer', ({ sdp }) => pc.setRemoteDescription(sdp));
 ```
    (`call:ice-candidate`, `call:connected` as for the visitor). **End** → `POST /api/host/meetings/:roomId/end`.
-ICE candidates may arrive before `setRemoteDescription`; queue them until it completes. Candidates received via `call:ice-candidate`
-for a stale connection should be ignored after `call:ended`.
+The host must also call `getUserMedia()` and add its tracks before creating the offer, and set `localVideo.srcObject` to its local
+stream. Both browsers must attach their own tracks and assign the remote stream in `ontrack`; otherwise each person may see only their
+own preview. ICE candidates can arrive before `setRemoteDescription`; queue them until it completes, as in the visitor example.
+Candidates received via `call:ice-candidate` for a stale connection should be ignored after `call:ended`.
 
 The backend never receives or stores media tracks. Browsers use `getUserMedia()` and `RTCPeerConnection`; Socket.IO relays only
-validated SDP and ICE signaling data. Configure public STUN URLs with `STUN_URLS`; TURN is optional and can use the included coturn
+validated SDP and ICE signaling data. ICE configuration defaults to Google's free public STUN server; override `STUN_URLS` to use
+your own STUN server. TURN is optional and can use the included coturn
 configuration with `TURN_URL` plus shared-secret or static credentials. TURN relays encrypted peer media only when direct ICE
 connectivity fails; it is self-hosted rather than a hosted calling provider.
 

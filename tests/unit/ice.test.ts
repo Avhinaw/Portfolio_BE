@@ -12,8 +12,8 @@ const base = {
 };
 
 describe('buildIceServers', () => {
-  it('returns an empty list when nothing is configured', () => {
-    expect(buildIceServers(loadEnv(base), 'room')).toEqual([]);
+  it('includes the default STUN server when no ICE configuration is provided', () => {
+    expect(buildIceServers(loadEnv(base), 'room')).toEqual([{ urls: ['stun:stun.l.google.com:19302'] }]);
   });
 
   it('adds STUN and static TURN credentials', () => {
@@ -38,7 +38,7 @@ describe('buildIceServers', () => {
     const secret = 's'.repeat(32);
     const env = loadEnv({ ...base, TURN_URL: 'turn:turn.example.com:3478', TURN_SHARED_SECRET: secret, TURN_CREDENTIAL_TTL_SECONDS: '600' });
     const now = 1_700_000_000_000;
-    const [server] = buildIceServers(env, 'abc', now);
+    const server = buildIceServers(env, 'abc', now).find((candidate) => candidate.username);
     expect(server?.username).toBe(`${1_700_000_000 + 600}:abc`);
     expect(server?.credential).toBe(createHmac('sha1', secret).update(server!.username!).digest('base64'));
   });
