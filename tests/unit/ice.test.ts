@@ -13,7 +13,9 @@ const base = {
 
 describe('buildIceServers', () => {
   it('includes the default STUN server when no ICE configuration is provided', () => {
-    expect(buildIceServers(loadEnv(base), 'room')).toEqual([{ urls: ['stun:stun.l.google.com:19302'] }]);
+    expect(buildIceServers(loadEnv(base), 'room')).toEqual([
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+    ]);
   });
 
   it('adds STUN and static TURN credentials', () => {

@@ -17,7 +17,7 @@ describe('environment validation', () => {
     expect(env.JWT_ACCESS_TTL).toBe(4 * 3600);
     expect(env.MAX_ACTIVE_CALLS).toBe(1);
     expect(env.HOST_DEFAULT_AVAILABLE).toBe(true);
-    expect(env.STUN_URLS).toEqual(['stun:stun.l.google.com:19302']);
+    expect(env.STUN_URLS).toEqual(['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478']);
     expect(env.TURN_URL).toEqual([]);
     expect(env.GEMINI_MODEL).toBe('gemini-2.5-flash');
     expect(env.HIRE_BOT_RATE_LIMIT_PER_MINUTE).toBe(10);
