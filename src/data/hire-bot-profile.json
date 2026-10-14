@@ -1,15 +1,235 @@
+
 {
-  "name": "",
-  "headline": "",
-  "location": "",
-  "about": "",
-  "currentCompany": "",
-  "skills": [],
-  "capabilities": [],
-  "experience": [],
-  "projects": [],
-  "education": [],
-  "achievements": [],
-  "funFacts": [],
-  "links": {}
+  "name": "Abhinav Tiwari",
+  "headline": "Full-Stack Developer | React.js | TypeScript | Node.js | AI Integrations",
+  "location": "Rewa, Madhya Pradesh, India",
+  "about": "I'm a self-taught software developer with 2+ years of professional development experience, specializing in building modern, responsive, and scalable web applications. My expertise includes React.js, TypeScript, JavaScript, Node.js, Express.js, MongoDB, and API integrations. I have experience developing frontend interfaces, backend services, REST APIs, microservices, AI-powered applications, and interactive websites. I've worked on **Niskai**, a platform used by businesses such as Ajay's Cafe, Verified, and Gujarat Vegetables, as well as projects for **Amwaly, Soksan**, and other applications. I enjoy solving complex technical problems, optimizing web performance, building seamless user experiences, and exploring emerging technologies such as AI and Web3.",
+  "currentCompany": "Resolute Solutions",
+  "skills": [
+    "JavaScript",
+    "TypeScript",
+    "Java",
+    "React.js",
+    "Next.js",
+    "Node.js",
+    "Express.js",
+    "NestJS",
+    "HTML5",
+    "CSS3",
+    "Tailwind CSS",
+    "MongoDB",
+    "PostgreSQL",
+    "MySQL",
+    "Redis",
+    "GHL",
+    "Wordpress",
+    "Sequelize",
+    "REST APIs",
+    "Microservices",
+    "RabbitMQ",
+    "Firebase",
+    "Git",
+    "Vite",
+    "Webflow",
+    "GSAP",
+    "Three.js",
+    "Stripe",
+    "Google Gemini API",
+    "AI Integration",
+    "Web3",
+    "Blockchain",
+    "Responsive Web Design",
+    "Web Performance Optimization",
+    "Data Structures and Algorithms"
+  ],
+  "capabilities": [
+  "Full-stack web application development",
+  "Responsive and modern frontend development",
+  "React.js and TypeScript application development",
+  "REST API design and integration",
+  "Backend development using Node.js and Express.js",
+  "Database design and management",
+  "Microservices architecture",
+  "AI-powered application development",
+  "AI API integration using Google Gemini",
+  "AI agents and intelligent workflow development",
+  "AI-powered automation and business process optimization",
+  "Workflow automation using n8n",
+  "GoHighLevel (GHL) CRM integration and automation",
+  "GoHighLevel funnels, forms, websites, and workflow customization",
+  "WordPress website development and customization",
+  "WordPress plugin and third-party integrations",
+  "Authentication and authorization systems",
+  "Third-party API integrations",
+  "Stripe subscription and payment integration",
+  "Performance optimization and Core Web Vitals",
+  "Interactive animations using GSAP and Three.js",
+  "Webflow website development",
+  "Web3 and blockchain application interfaces",
+  "Admin dashboards and management panels",
+  "DevOps fundamentals and deployment workflows",
+  "CI/CD pipeline configuration",
+  "Application deployment and hosting",
+  "Environment configuration and server management",
+  "Production debugging and performance monitoring",
+  "Cloud deployment and infrastructure management"
+],
+"experience": [
+  {
+    "company": "Resolute Solutions",
+    "role": "Frontend Developer",
+    "duration": "Current role — exact dates not provided",
+    "description": "Developing and maintaining modern web applications, building responsive frontend interfaces, integrating REST APIs, creating admin dashboards, and contributing to backend features and third-party integrations. Working with React.js, TypeScript, Node.js, databases, AI integrations, and performance optimization."
+  },
+  {
+    "company": "Fix Web Vitals",
+    "role": "Frontend Developer",
+    "duration": "1 year full-time",
+    "description": "Worked on frontend development, responsive website design, website performance optimization, Core Web Vitals improvements, and user experience enhancements. Contributed to debugging frontend issues, improving page speed, and delivering modern web interfaces."
+  },
+  {
+    "company": "Fix Web Vitals",
+    "role": "Frontend Developer Intern",
+    "duration": "3 months",
+    "description": "Gained practical experience in frontend development, responsive UI implementation, website performance optimization, debugging, and improving user experience. Built a foundation in modern web development practices before transitioning to a full-time role."
+  }
+],
+  "projects": [
+    {
+      "name": "AI Chat Application",
+      "description": "An AI-powered chat application integrating the Google Gemini API, with a Node.js and Express backend, a Next.js frontend, Redis for recent conversation context, and MongoDB for persistent chat history.",
+      "technologies": [
+        "Next.js",
+        "Node.js",
+        "Express.js",
+        "Google Gemini API",
+        "Redis",
+        "MongoDB"
+      ]
+    },
+    {
+      "name": "Learnvibe",
+      "description": "An AI-powered learning application that generates quizzes from uploaded documents, PDFs, and images.",
+      "technologies": [
+        "React",
+        "TypeScript",
+        "AI Integration",
+        "File Uploads",
+        "REST APIs"
+      ]
+    },
+    {
+      "name": "Nishk",
+      "description": "An application focused on connecting data sources, including WooCommerce and Excel, and providing AI-powered insights through an analytics experience similar to Power BI.",
+      "technologies": [
+        "React",
+        "TypeScript",
+        "API Integrations",
+        "AI",
+        "Data Analytics"
+      ]
+    },
+    {
+      "name": "AvhiSafe Web3 Wallet",
+      "description": "A Web3 wallet project exploring blockchain-based functionality and decentralized application experiences.",
+      "technologies": [
+        "React",
+        "JavaScript",
+        "Web3",
+        "Blockchain"
+      ]
+    },
+    {
+      "name": "StudyNotion",
+      "description": "An educational technology website designed to provide an online learning experience.",
+      "technologies": [
+        "React",
+        "Node.js",
+        "Express.js",
+        "MongoDB"
+      ]
+    },
+    {
+      "name": "Obys Agency Clone",
+      "description": "An agency-style website recreation focused on modern visual design, interactive animations, and polished frontend experiences.",
+      "technologies": [
+        "React",
+        "JavaScript",
+        "GSAP",
+        "CSS"
+      ]
+    },
+    {
+      "name": "Weather App",
+      "description": "A responsive weather application that retrieves and displays weather information using an external API.",
+      "technologies": [
+        "React",
+        "JavaScript",
+        "REST APIs",
+        "CSS"
+      ]
+    },
+    {
+      "name": "Tour Planner React App",
+      "description": "A React application focused on presenting travel destinations and helping users explore trip-planning information.",
+      "technologies": [
+        "React",
+        "JavaScript",
+        "HTML",
+        "CSS"
+      ]
+    },
+    {
+      "name": "NestJS Microservices",
+      "description": "A backend project implementing separate product, order, and customer services with message-based communication.",
+      "technologies": [
+        "NestJS",
+        "RabbitMQ",
+        "TypeScript",
+        "Microservices"
+      ]
+    },
+    {
+      "name": "FindEvent",
+      "description": "An event discovery experience with filtering capabilities and podcast integration using the Listen Notes API.",
+      "technologies": [
+        "Next.js",
+        "React",
+        "TypeScript",
+        "Listen Notes API"
+      ]
+    }
+  ],
+  "education": [
+    {
+  "degree": "Bachelor of Business Administration (BBA)",
+  "specialization": "Human Resources (HR)",
+  "institution": "Awadhesh Pratap Singh University",
+  "location": "Rewa, Madhya Pradesh, India"
+}
+  ],
+  "achievements": [
+    "Built full-stack applications through self-directed learning and practical development experience.",
+    "Worked with AI APIs to build AI-powered chat and document-based quiz generation features.",
+    "Implemented backend services, database integrations, and microservices using Node.js and TypeScript.",
+    "Practiced data structures and algorithms through regular coding challenges.",
+    "Gained experience with payment integrations, subscription management, and third-party APIs."
+  ],
+  "funFacts": [
+    "I'm a self-taught developer who transitioned into software development from a non-IT background.",
+    "I enjoy experimenting with AI tools and building AI-powered products.",
+    "I'm interested in Web3, blockchain, and decentralized applications.",
+    "I enjoy creating interactive websites with GSAP and Three.js.",
+    "I practice data structures and algorithms to improve my problem-solving skills.",
+    "I enjoy sci-fi movies and gaming, including GTA Online."
+  ],
+  "links": {
+    "portfolio": "https://avhinaw.netlify.app/",
+    "github": "https://github.com/Avhinaw",
+    "linkedin": "",
+    "email": "",
+    "resume": "",
+    "leetcode": "",
+    "other": []
+  }
 }
