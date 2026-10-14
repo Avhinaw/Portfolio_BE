@@ -9,7 +9,24 @@ interface GeminiResponse {
     content?: {
       parts?: Array<{ text?: string }>;
     };
+    finishReason?: string;
   }>;
+  promptFeedback?: {
+    blockReason?: string;
+  };
+  error?: {
+    code?: string | number;
+    status?: string;
+    message?: string;
+  };
+}
+
+function safeProviderMessage(message: string | undefined, apiKey: string): string | undefined {
+  if (!message) return undefined;
+  return message
+    .replaceAll(apiKey, '[REDACTED]')
+    .replace(/([?&]key=)[^&\s]+/gi, '$1[REDACTED]')
+    .slice(0, 500);
 }
 
 const SYSTEM_INSTRUCTION = `You are HireBot, a portfolio assistant that answers questions about the portfolio owner.
@@ -59,14 +76,33 @@ export async function answerHireBot(input: HireBotBody): Promise<string> {
   }
 
   if (!response.ok) {
-    logger.warn({ status: response.status }, 'hire bot provider returned an error');
+    let providerError: GeminiResponse['error'];
+    try {
+      providerError = ((await response.json()) as GeminiResponse).error;
+    } catch {
+      providerError = undefined;
+    }
+    logger.warn(
+      {
+        httpStatus: response.status,
+        httpStatusText: response.statusText,
+        providerCode: providerError?.code,
+        providerStatus: providerError?.status,
+        providerMessage: safeProviderMessage(providerError?.message, env.GEMINI_API_KEY),
+      },
+      'hire bot provider returned an error',
+    );
     throw new AppError(502, 'hire_bot_provider_error', 'The hire bot AI provider returned an error');
   }
 
   let result: GeminiResponse;
   try {
     result = (await response.json()) as GeminiResponse;
-  } catch {
+  } catch (err) {
+    logger.warn(
+      { httpStatus: response.status, err: err instanceof Error ? err.name : 'unknown' },
+      'hire bot provider returned invalid JSON',
+    );
     throw new AppError(502, 'hire_bot_invalid_response', 'The hire bot AI provider returned an invalid response');
   }
 
@@ -75,6 +111,14 @@ export async function answerHireBot(input: HireBotBody): Promise<string> {
     .join('')
     .trim();
   if (!answer) {
+    logger.warn(
+      {
+        blockReason: result.promptFeedback?.blockReason,
+        finishReason: result.candidates?.[0]?.finishReason,
+        candidateCount: result.candidates?.length ?? 0,
+      },
+      'hire bot provider returned no answer',
+    );
     throw new AppError(502, 'hire_bot_empty_response', 'The hire bot AI provider returned no answer');
   }
   return answer;
