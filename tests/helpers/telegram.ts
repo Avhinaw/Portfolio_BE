@@ -17,7 +17,7 @@ export const telegramError = (status: number, description: string, retryAfter?: 
  */
 export function mockTelegram(responder: Responder): Mock {
   const realFetch = globalThis.fetch;
-  const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  const mock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     if (url.startsWith('https://api.telegram.org/')) return responder(url, init);
     return realFetch(input, init);
@@ -29,7 +29,7 @@ export function mockTelegram(responder: Responder): Mock {
 /** Default guard: any api.telegram.org call that a test did not explicitly mock fails instead of going out. */
 export function blockTelegram(): void {
   const realFetch = globalThis.fetch;
-  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
     if (String(input).startsWith('https://api.telegram.org/')) {
       return Promise.reject(new TypeError('Telegram is blocked in tests unless explicitly mocked'));
     }

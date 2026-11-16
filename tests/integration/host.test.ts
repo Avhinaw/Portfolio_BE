@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { CallSlot } from '../../src/models/CallSlot';
+import { HOST_STATE_ID, HostState } from '../../src/models/HostState';
 import { Meeting } from '../../src/models/Meeting';
 import {
   HOST_EMAIL,
@@ -28,6 +29,11 @@ afterEach(async () => {
   // Reset to a clean slate between tests.
   await Meeting.deleteMany({});
   await CallSlot.deleteMany({});
+  await HostState.findOneAndUpdate(
+    { _id: HOST_STATE_ID },
+    { $set: { available: true, scheduleEnabled: false, scheduleTimezone: 'UTC', unavailableWindows: [] } },
+    { upsert: true },
+  );
 });
 
 const accept = (roomId: string) => request(server.app).post(`/api/host/meetings/${roomId}/accept`).set(bearer(token));
@@ -216,5 +222,35 @@ describe('concurrency and availability', () => {
 
     await request(server.app).put('/api/host/availability').set(bearer(token)).send({ available: true });
     expect((await request(server.app).post('/api/meetings').send({ visitorName: 'X' })).status).toBe(201);
+  });
+
+  it('persists a weekly schedule and blocks both public requests and admin acceptance during it', async () => {
+    const dayOfWeek = new Date().getUTCDay();
+    const schedule = { enabled: true, timezone: 'UTC', windows: [{ dayOfWeek, startMinute: 0, endMinute: 1440 }] };
+    const saved = await request(server.app).put('/api/host/availability/schedule').set(bearer(token)).send(schedule);
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.schedule).toEqual(schedule);
+    expect(saved.body.data.available).toBe(false);
+    expect((await request(server.app).get('/api/availability')).body.data).toEqual({ available: false, busy: false });
+
+    const blocked = await request(server.app).post('/api/meetings').send({ visitorName: 'Scheduled visitor' });
+    expect(blocked.status).toBe(503);
+    expect(blocked.body.error.code).toBe('host_unavailable');
+
+    await request(server.app).put('/api/host/availability/schedule').set(bearer(token)).send({ enabled: false, timezone: 'UTC', windows: [] });
+    const meeting = await createMeeting(server.app, 'After hours');
+    await request(server.app).put('/api/host/availability/schedule').set(bearer(token)).send(schedule);
+    const accepted = await accept(meeting.roomId);
+    expect(accepted.status).toBe(503);
+    expect(accepted.body.error.code).toBe('host_unavailable');
+  });
+
+  it('rejects malformed schedules before persisting them', async () => {
+    const invalid = await request(server.app)
+      .put('/api/host/availability/schedule')
+      .set(bearer(token))
+      .send({ enabled: true, timezone: 'Not/AZone', windows: [{ dayOfWeek: 1, startMinute: 480, endMinute: 60 }] });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe('validation_error');
   });
 });

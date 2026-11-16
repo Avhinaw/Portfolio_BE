@@ -187,6 +187,33 @@ paths:
       security: [{ hostBearer: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [available], properties: { available: { type: boolean } } } } } }
       responses: { '200': { description: ok } }
+  /api/host/availability/schedule:
+    put:
+      summary: Set recurring weekly unavailable hours
+      security: [{ hostBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled, timezone, windows]
+              properties:
+                enabled: { type: boolean }
+                timezone: { type: string, example: Asia/Kolkata }
+                windows:
+                  type: array
+                  maxItems: 7
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [dayOfWeek, startMinute, endMinute]
+                    properties:
+                      dayOfWeek: { type: integer, minimum: 0, maximum: 6, description: Sunday is 0 }
+                      startMinute: { type: integer, minimum: 0, maximum: 1439 }
+                      endMinute: { type: integer, minimum: 1, maximum: 1440 }
+      responses: { '200': { description: Schedule saved }, '400': { $ref: '#/components/responses/Err' } }
   /api/host/ice-servers:
     get: { security: [{ hostBearer: [] }], responses: { '200': { description: '{iceServers:[...]}' } } }
   /api/host/telegram/test:

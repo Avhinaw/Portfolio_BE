@@ -95,6 +95,7 @@ src/
   `roomId`. Acquiring a slot is an atomic insert, so it holds across multiple backend instances (MongoDB is the arbiter).
   Slots are released on every terminal transition; a reconciler removes orphaned slots (> 60 s old, no active meeting).
 * `PUT /api/host/availability {available:false}` makes new requests fail with 503 `host_unavailable`.
+* Recurring unavailable hours are stored in `HostState` and evaluated server-side using the configured IANA timezone. Update them with `PUT /api/host/availability/schedule` and a body such as `{ "enabled": true, "timezone": "Asia/Kolkata", "windows": [{ "dayOfWeek": 0, "startMinute": 60, "endMinute": 480 }] }`. `dayOfWeek` uses Sunday `0` through Saturday `6`; windows use minutes after midnight and cannot overlap. The schedule blocks both new visitor requests and host acceptance while active. The manual `available` flag remains an independent override.
 * Duplicate/abusive requests: `MAX_PENDING_PER_VISITOR` (keyed HMAC of client IP, raw IPs are never stored), `MAX_PENDING_REQUESTS`,
   and `POST /api/host/meetings/bulk/reject-pending`. These pending-count checks are soft limits (check-then-insert); the hard
   guarantees are the slot and transition atomicity above.
@@ -141,7 +142,8 @@ Schemas: [`docs/openapi.yaml`](docs/openapi.yaml). `$API` = `http://localhost:30
 | `POST /api/host/meetings/:roomId/reject` | Bearer | 409 `meeting_expired` / `invalid_state` |
 | `POST /api/host/meetings/:roomId/end` | Bearer | accepted/in_progress → ended |
 | `POST /api/host/meetings/bulk/reject-pending` | Bearer | `{rejected: n}` |
-| `GET/PUT /api/host/availability` | Bearer | PUT `{available:boolean}` |
+| `GET/PUT /api/host/availability` | Bearer | PUT `{available:boolean}` for the manual override; GET also returns the effective availability and recurring schedule |
+| `PUT /api/host/availability/schedule` | Bearer | Set `{enabled,timezone,windows[]}` for recurring unavailable hours |
 | `GET /api/host/ice-servers` | Bearer | ICE servers for the host browser |
 | `POST /api/host/telegram/test` | Bearer | 200 only if Telegram accepted it; 502 `telegram_error` otherwise; 409 if unconfigured |
 
