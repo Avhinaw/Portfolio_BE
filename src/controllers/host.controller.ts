@@ -11,12 +11,14 @@ import {
   rejectAllPending,
   rejectMeeting,
   setAvailability,
+  setAvailabilitySchedule,
 } from '../services/meeting.service';
 import { TelegramError, isTelegramConfigured, sendTelegramMessage } from '../services/telegram.service';
 import { ok } from '../utils/asyncHandler';
 import { AppError, conflict } from '../utils/errors';
 import type { MeetingStatus } from '../models/Meeting';
 import type { LoginBody } from '../validators/auth.validator';
+import type { AvailabilitySchedule } from '../utils/availability';
 
 export async function loginHandler(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body as LoginBody;
@@ -60,6 +62,10 @@ export async function availabilityGet(_req: Request, res: Response): Promise<voi
 
 export async function availabilitySet(req: Request, res: Response): Promise<void> {
   ok(res, await setAvailability((req.body as { available: boolean }).available));
+}
+
+export async function availabilityScheduleSet(req: Request, res: Response): Promise<void> {
+  ok(res, await setAvailabilitySchedule(req.body as AvailabilitySchedule));
 }
 
 export async function iceServers(req: Request, res: Response): Promise<void> {

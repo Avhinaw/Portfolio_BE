@@ -5,7 +5,7 @@ import type { RateLimiters } from '../middleware/rateLimit.middleware';
 import { validate } from '../middleware/validation.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import { loginBody } from '../validators/auth.validator';
-import { availabilityBody, hostListQuery, roomIdParams } from '../validators/meeting.validator';
+import { availabilityBody, availabilityScheduleBody, hostListQuery, roomIdParams } from '../validators/meeting.validator';
 
 export function createHostRouter(limits: RateLimiters): Router {
   const router = Router();
@@ -33,6 +33,7 @@ export function createHostRouter(limits: RateLimiters): Router {
 
   router.get('/availability', asyncHandler(controller.availabilityGet));
   router.put('/availability', validate({ body: availabilityBody }), asyncHandler(controller.availabilitySet));
+  router.put('/availability/schedule', validate({ body: availabilityScheduleBody }), asyncHandler(controller.availabilityScheduleSet));
 
   router.get('/ice-servers', asyncHandler(controller.iceServers));
   router.post('/telegram/test', asyncHandler(controller.telegramTest));

@@ -8,6 +8,12 @@ import { generateRoomId, generateVisitorToken, hashToken, safeEqualHex } from '.
 import { dispatchNotification } from './notification.service';
 import { emitToHosts, emitToMeeting } from './realtime';
 import { ACTIVE_STATUSES, TERMINAL_STATUSES, allowedFrom } from './meeting.state';
+import {
+  DEFAULT_AVAILABILITY_SCHEDULE,
+  isWithinUnavailableSchedule,
+  normalizeSchedule,
+  type AvailabilitySchedule,
+} from '../utils/availability';
 
 /* ----------------------------------------------------------------------------------------------
  * Views (what leaves the server). Internal ids, token hashes, socket ids and fingerprints never do.
@@ -182,8 +188,22 @@ export async function getAvailability() {
     CallSlot.countDocuments({}),
     Meeting.countDocuments({ status: 'pending', expiresAt: { $gt: new Date() } }),
   ]);
+  const schedule = normalizeSchedule(
+    state
+      ? {
+          enabled: state.scheduleEnabled,
+          timezone: state.scheduleTimezone,
+          windows: state.unavailableWindows,
+        }
+      : DEFAULT_AVAILABILITY_SCHEDULE,
+  );
+  const manualAvailable = state ? state.available : env.HOST_DEFAULT_AVAILABLE;
+  const scheduleActive = isWithinUnavailableSchedule(schedule);
   return {
-    available: state ? state.available : env.HOST_DEFAULT_AVAILABLE,
+    available: manualAvailable && !scheduleActive,
+    manualAvailable,
+    schedule,
+    scheduleActive,
     activeCalls,
     maxActiveCalls: env.MAX_ACTIVE_CALLS,
     pendingCount,
@@ -194,6 +214,25 @@ export async function setAvailability(available: boolean) {
   await HostState.findOneAndUpdate(
     { _id: HOST_STATE_ID },
     { $set: { available, updatedAt: new Date() } },
+    { upsert: true },
+  );
+  const state = await getAvailability();
+  emitToHosts('host:availability', state);
+  return state;
+}
+
+export async function setAvailabilitySchedule(schedule: AvailabilitySchedule) {
+  await HostState.findOneAndUpdate(
+    { _id: HOST_STATE_ID },
+    {
+      $set: {
+        scheduleEnabled: schedule.enabled,
+        scheduleTimezone: schedule.timezone,
+        unavailableWindows: schedule.windows,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: { available: getEnv().HOST_DEFAULT_AVAILABLE },
+    },
     { upsert: true },
   );
   const state = await getAvailability();
@@ -360,6 +399,10 @@ export async function acceptMeeting(roomId: string) {
   const current = await applyTimeouts(found);
   if (current.status === 'expired') throw conflict('meeting_expired', 'This request has expired');
   if (current.status !== 'pending') throw conflict('invalid_state', `A meeting that is ${current.status} cannot be accepted`);
+
+  if (!(await getAvailability()).available) {
+    throw unavailable('host_unavailable', 'The host is not accepting calls right now');
+  }
 
   if (!(await acquireSlot(roomId))) {
     throw conflict('host_busy', 'The maximum number of active calls has been reached');
